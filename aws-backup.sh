@@ -1,7 +1,13 @@
 #!/bin/bash
 
-# configuration
+###################################
+# script's configuration
+###################################
+
+# how long to keep the snapshots
 daysToKeep=30
+# standard prefix for auto-generated snapshots
+prefix="auto-generated-snapshot"
 
 # please do not change the lines below!
 
@@ -26,21 +32,22 @@ while read ignore1 ignore2 ignore3 ignore4 name; do
     instanceName="$name"
 done <<< $instanceDescription
 
-# get the volume id
-volume=`/opt/aws/bin/ec2-describe-instances -O $accessKey -W $secretKey --region $region $instance | awk '/vol-*/ {print $3}'`
-
-# define a standard prefix
-prefix="auto-generated-snapshot"
+# get the volume ids
+volumeIds=`/opt/aws/bin/ec2-describe-instances -O $accessKey -W $secretKey --region $region $instance | awk '/vol-*/ {print $3}'`
 
 # generate a timestamp
 date=`date +"%Y-%m-%d %H:%M:%S"`
 
-# concatenate all information into one description
-description="$prefix - instanceName: $instanceName, instanceId: $instance, volumeId: $volume, time: $date"
-
-# stop mysql, create a snapshop and start it again
+# stop mysql, create snapshots and start it again
 /etc/init.d/mysqld stop
-/opt/aws/bin/ec2-create-snapshot -O $accessKey -W $secretKey -d "$description" --region $region $volume
+while read -r volumeId; do
+
+    # concatenate all information into one description
+    description="$prefix - instanceName: $instanceName, instanceId: $instance, volumeId: $volumeId, time: $date"
+    # create a new snapshot
+    /opt/aws/bin/ec2-create-snapshot -O $accessKey -W $secretKey -d "$description" --region $region $volumeId
+
+done <<< "$volumeIds"
 /etc/init.d/mysqld start
 
 ###################################
