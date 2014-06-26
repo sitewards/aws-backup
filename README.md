@@ -25,3 +25,9 @@ Usage:
 4. By default the snapshots older than 30 days are deleted. If you want to change it, you can adjust the variable $daysToKeep at  the beginning of the script
 
 5. Run and enjoy
+
+6. If you want to run this script as a cron job, please add following line to the root's cronjobs (with your path to the script):
+
+````
+       01 01 * * * export AWS_BACKUP_ACCESS_KEY="AKIAIOSFODNN7EXAMPLE" && export AWS_BACKUP_SECRET_KEY="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" && export AWS_BACKUP_REGION="eu-west-1" &&  /bin/bash /home/ec2-user/aws-backup/aws-backup.sh
+````
