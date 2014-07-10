@@ -26,20 +26,25 @@ export JAVA_HOME="/usr/lib/jvm/jre"
 # get the instance id of the current machine
 instance=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`
 
+# get the full information about the current instance
+fullDescription=`/opt/aws/bin/ec2-describe-instances -O $accessKey -W $secretKey --region $region $instance`
+
+# print the information
+printf "Instance info:\n----------------------\n$fullDescription\n----------------------\n";
+
 # get the name of the current instance
-instanceDescription=`/opt/aws/bin/ec2-describe-instances -O $accessKey -W $secretKey --region $region $instance | grep Name`
+instanceDescription=`echo "$fullDescription" | grep Name`
 while read ignore1 ignore2 ignore3 ignore4 name; do
     instanceName="$name"
 done <<< $instanceDescription
 
 # get the volume ids
-volumeIds=`/opt/aws/bin/ec2-describe-instances -O $accessKey -W $secretKey --region $region $instance | awk '/vol-*/ {print $3}'`
+volumeIds=`echo "$fullDescription" | awk '/vol-*/ {print $3}'`
 
 # generate a timestamp
 date=`date +"%Y-%m-%d %H:%M:%S"`
 
-# stop mysql, create snapshots and start it again
-/etc/init.d/mysqld stop
+# create snapshots 
 while read -r volumeId; do
 
     # concatenate all information into one description
@@ -48,7 +53,6 @@ while read -r volumeId; do
     /opt/aws/bin/ec2-create-snapshot -O $accessKey -W $secretKey -d "$description" --region $region $volumeId
 
 done <<< "$volumeIds"
-/etc/init.d/mysqld start
 
 ###################################
 # remove old snapshots
