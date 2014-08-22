@@ -17,6 +17,7 @@ secretKey="$AWS_BACKUP_SECRET_KEY"
 region="$AWS_BACKUP_REGION"
 
 export JAVA_HOME="/usr/lib/jvm/jre"
+PATH=$PATH:/opt/aws/bin/
 
 ###################################
 # generate a new snapshot
