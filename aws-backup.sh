@@ -16,7 +16,6 @@ accessKey="$AWS_BACKUP_ACCESS_KEY"
 secretKey="$AWS_BACKUP_SECRET_KEY"
 region="$AWS_BACKUP_REGION"
 
-export EC2_HOME="/opt/aws/apitools/ec2/"
 export JAVA_HOME="/usr/lib/jvm/jre"
 
 ###################################
@@ -27,7 +26,7 @@ export JAVA_HOME="/usr/lib/jvm/jre"
 instance=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id`
 
 # get the full information about the current instance
-fullDescription=`/opt/aws/bin/ec2-describe-instances -O $accessKey -W $secretKey --region $region $instance`
+fullDescription=`ec2-describe-instances -O $accessKey -W $secretKey --region $region $instance`
 
 # print the information
 printf "Instance info:\n----------------------\n$fullDescription\n----------------------\n";
@@ -50,7 +49,7 @@ while read -r volumeId; do
     # concatenate all information into one description
     description="$prefix - instanceName: $instanceName, instanceId: $instance, volumeId: $volumeId, time: $date"
     # create a new snapshot
-    /opt/aws/bin/ec2-create-snapshot -O $accessKey -W $secretKey -d "$description" --region $region $volumeId
+    ec2-create-snapshot -O $accessKey -W $secretKey -d "$description" --region $region $volumeId
 
 done <<< "$volumeIds"
 
@@ -59,7 +58,7 @@ done <<< "$volumeIds"
 ###################################
 
 # get all automatically generated snapshots
-snapshots="`/opt/aws/bin/ec2-describe-snapshots -O $accessKey -W $secretKey --region $region | grep "$prefix"`"
+snapshots="`ec2-describe-snapshots -O $accessKey -W $secretKey --region $region | grep "$prefix"`"
 
 # iterate through all snapshots
 while read -r snapshot; do
@@ -73,7 +72,7 @@ while read -r snapshot; do
         # if the current snapshot is older than timestampDiffMax, delete it
         if [ "$timestampDiff" -gt "$timestampDiffMax" ]
         then
-            /opt/aws/bin/ec2-delete-snapshot -O $accessKey -W $secretKey --region $region $snapshotId
+            ec2-delete-snapshot -O $accessKey -W $secretKey --region $region $snapshotId
         fi
 
     done <<< "$snapshot"
