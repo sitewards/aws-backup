@@ -5,7 +5,7 @@
 ###################################
 
 # how long to keep the snapshots
-daysToKeep=30
+daysToKeep=14
 # standard prefix for auto-generated snapshots
 prefix="auto-generated-snapshot"
 
