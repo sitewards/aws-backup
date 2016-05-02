@@ -42,6 +42,9 @@ done <<< $instanceDescription
 # get the volume ids
 volumeIds=`echo "$fullDescription" | awk '/vol-*/ {print $3}'`
 
+#get instance tags
+instanceTags=`echo "$fullDescription" | grep TAG`;
+
 # generate a timestamp
 date=`date +"%Y-%m-%d %H:%M:%S"`
 
@@ -49,10 +52,20 @@ date=`date +"%Y-%m-%d %H:%M:%S"`
 while read -r volumeId; do
 
     # concatenate all information into one description
-    description="$prefix - instanceName: $instanceName, instanceId: $instance, volumeId: $volumeId, time: $date"
+    description="$prefix - instanceName: $instanceName, instanceId: $instance, volumeId: $volumeId, time: $date";
     # create a new snapshot
-    ec2-create-snapshot -O $accessKey -W $secretKey -d "$description" --region $region $volumeId
+    snapshotData=`ec2-create-snapshot -O $accessKey -W $secretKey -d "$description" --region $region $volumeId`;
+    printf "Created snapshot:\n---------\n$snapshotData\n--------\n";
 
+    #assign instance tags to the snapshot
+    snapshotId=`echo "$snapshotData" | awk '/snap-*/ {print $2}'`;
+    tagsArgs="";
+    while read -r ignore1 ignore2 ignore3 tagName tagValue; do
+        if [ "$tagName" != "Name" ]; then # this is weird but name tagging doesn't work quite nice.
+           tagsArgs="--tag \"$tagName=$tagValue\" $tagsArgs";
+	fi
+    done <<< "$instanceTags"
+    ec2-create-tags $snapshotId -O $accessKey -W $secretKey --region $region $tagsArgs;
 done <<< "$volumeIds"
 
 ###################################

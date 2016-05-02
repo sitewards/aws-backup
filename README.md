@@ -15,6 +15,7 @@ Usage:
      - DescribeVolumeStatus
      - DescribeVolumes
      - DescribeInstances
+     - CreateTags
 
 2. Define following environment variables containing the credentials of the new user:
      - $AWS_BACKUP_ACCESS_KEY, i.e. AKIAIOSFODNN7EXAMPLE
