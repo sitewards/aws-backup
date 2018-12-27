@@ -16,6 +16,11 @@ accessKey="$AWS_BACKUP_ACCESS_KEY"
 secretKey="$AWS_BACKUP_SECRET_KEY"
 region="$AWS_BACKUP_REGION"
 
+if [[ -z  $region  ]]; then
+    availabilityZone=$(wget -q -O - http://169.254.169.254/latest/meta-data/placement/availability-zone/);
+    region=$(echo "$availabilityZone" | grep -oP "[a-z]{1,}-[a-z]{1,}-\\d{1,}");
+fi
+
 export JAVA_HOME="/usr/lib/jvm/jre"
 export EC2_HOME="/opt/aws/apitools/ec2"
 PATH=$PATH:/opt/aws/bin/
@@ -28,44 +33,45 @@ PATH=$PATH:/opt/aws/bin/
 instance=$(wget -q -O - http://169.254.169.254/latest/meta-data/instance-id);
 
 # get the full information about the current instance
-fullDescription=$(ec2-describe-instances -O "$accessKey" -W "$secretKey" --region "$region" "$instance");
+fullDescription=$(aws ec2 describe-instances --instance-ids "$instance" --output text);
 
 # print the information
 printf "Instance info:\n----------------------\n%s\n----------------------\n" "$fullDescription";
 
 # get the name of the current instance
 instanceDescription=$(echo "$fullDescription" | grep Name);
-while read ignore1 ignore2 ignore3 ignore4 name; do
+while read ignore1 ignore2 name; do
     instanceName="$name"
 done <<< "$instanceDescription"
 
 # get the volume ids
-volumeIds=$(echo "$fullDescription" | awk '/vol-*/ {print $3}');
+volumeIds=$(echo "$fullDescription" | awk '/vol-*/ {print $5}');
 
 #get instance tags
 instanceTags=$(echo "$fullDescription" | grep TAG);
 
 # generate a timestamp
 date=$(date +"%Y-%m-%d %H:%M:%S");
-
-# create snapshots 
+# create snapshots
 while read -r volumeId; do
 
     # concatenate all information into one description
     description="$prefix - instanceName: $instanceName, instanceId: $instance, volumeId: $volumeId, time: $date";
     # create a new snapshot
-    snapshotData=$(ec2-create-snapshot -O "$accessKey" -W "$secretKey" -d "$description" --region "$region" "$volumeId");
+    snapshotData=$(aws ec2 create-snapshot --description "$description" --region "$region" --volume-id "$volumeId" --output json);
     printf "Created snapshot:\n---------\n%s\n--------\n" "$snapshotData";
 
     #assign instance tags to the snapshot
-    snapshotId=$(echo "$snapshotData" | awk '/snap-*/ {print $2}');
+    snapshotId=$(echo "$snapshotData" | grep -oP 'snap-[a-z0-9]+');
+
     tagsArgs="";
-    while read -r ignore1 ignore2 ignore3 tagName tagValue; do
+    while read -r ignore1 tagName tagValue; do
         if [ "$tagName" != "Name" ]; then # this is weird but name tagging doesn't work quite nice.
-           tagsArgs="--tag \"$tagName=$tagValue\" $tagsArgs";
-	fi
+           tagsArgs="Key=$tagName,Value=$tagValue   $tagsArgs";
+        fi
     done <<< "$instanceTags"
-    ec2-create-tags "$snapshotId" -O "$accessKey" -W "$secretKey" --region "$region" $tagsArgs;
+
+    aws ec2 create-tags --resources "$snapshotId" --region "$region" --tags="$tagsArgs";
 done <<< "$volumeIds"
 
 ###################################
@@ -73,21 +79,20 @@ done <<< "$volumeIds"
 ###################################
 
 # get all automatically generated snapshots
-snapshots=$(ec2-describe-snapshots -O "$accessKey" -W "$secretKey" --region "$region" | grep "$prefix");
-
+snapshots=$(aws ec2 describe-snapshots --region "$region" --output text --query 'Snapshots[*].{ID:SnapshotId,Time:StartTime,ZDesc:Description}'  --filters Name=description,Values="$prefix*");
 # iterate through all snapshots
 while read -r snapshot; do
-    while read ignore1 snapshotId ignore2 ignore3 timestamp ignore4; do
-
+    while read snapshotId timestamp snapshotDesc; do
         timestampSnapshot=$(date -d "$timestamp" "+%s");
         timestampCurrent=$(date +"%s");
         timestampDiff=$(( $timestampCurrent - $timestampSnapshot ));
         timestampDiffMax=$(( 60 * 60 * 24 * $daysToKeep  ));
+        snapshotInstanceId=$(echo "$snapshotDesc" | grep -oP 'instanceId: (i-[a-z0-9]+),' | grep -oP 'i-[a-z0-9]+');
 
         # if the current snapshot is older than timestampDiffMax, delete it
-        if [ "$timestampDiff" -gt "$timestampDiffMax" ]
+        if [ "$instance" == "$snapshotInstanceId" ] && [ "$timestampDiff" -gt "$timestampDiffMax" ]
         then
-            ec2-delete-snapshot -O "$accessKey" -W "$secretKey" --region "$region" "$snapshotId"
+            aws ec2 delete-snapshot --region "$region" --snapshot-id="$snapshotId"
         fi
 
     done <<< "$snapshot"
