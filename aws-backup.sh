@@ -33,11 +33,10 @@ PATH=$PATH:/opt/aws/bin/
 instance=$(wget -q -O - http://169.254.169.254/latest/meta-data/instance-id);
 
 # get the full information about the current instance
-fullDescription=$(aws ec2 describe-instances --instance-ids "$instance" --output text);
+fullDescription=$(aws ec2 describe-instances --instance-ids "$instance" --region "$region" --output text);
 
 # print the information
 printf "Instance info:\n----------------------\n%s\n----------------------\n" "$fullDescription";
-
 # get the name of the current instance
 instanceDescription=$(echo "$fullDescription" | grep Name);
 while read ignore1 ignore2 name; do
