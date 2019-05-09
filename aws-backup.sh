@@ -70,7 +70,7 @@ while read -r volumeId; do
         fi
     done <<< "$instanceTags"
 
-    aws ec2 create-tags --resources "$snapshotId" --region "$region" --tags="$tagsArgs";
+    eval aws ec2 create-tags --resources "$snapshotId" --region "$region" --tags "$tagsArgs";
 done <<< "$volumeIds"
 
 ###################################
